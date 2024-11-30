@@ -2,8 +2,12 @@
 #include <stdint.h>
 #include <string.h>
 #include <ctype.h> 
+#include <stdlib.h>
 #include "filesys.h"
 #include "commands.h"
+
+OpenFile open_files[MAX_OPEN_FILES];
+int open_file_count = 0;
 
 // Helper function to read a directory entry
 int read_directory_entry(uint32_t cluster, int entry_index, char *name, uint8_t *attributes, uint32_t *next_cluster) {
@@ -123,4 +127,118 @@ void execute_info() {
     printf("Entries in One FAT: %u\n", boot_sector.sectors_per_fat);
     printf("Size of Image (in bytes): %u\n",
            boot_sector.bytes_per_sector * boot_sector.sectors_per_cluster * boot_sector.total_sectors);
+}
+
+void execute_open(char *filename, char *flags) {
+    if (open_file_count >= MAX_OPEN_FILES) {
+        fprintf(stderr, "Error: Maxium open files reached\n");
+        return;
+    }
+
+    if (strcmp(flags, "-r") != 0 && strcmp(flags, "-w") != 0 &&
+        strcmp(flags, "-rw") != 0 && strcmp(flags, "-wr") != 0) {
+        fprintf(stderr, "Error: Invalid mode %s\n", flags);
+        return;
+    }
+
+    // Check if the file is already opened
+    for (int i = 0; i < open_file_count; ++i) {
+        if (strcmp(open_files[i].filename, filename) == 0) {
+            fprintf(stderr, "Error: File %s is already open\n", filename);
+            return;
+        }
+    }
+
+    // Check if the file exists (you can use `fopen` in read mode to check existence)
+    FILE *file = fopen(filename, "rb");
+    if (!file) {
+        fprintf(stderr, "Error: File %s does not exist\n", filename);
+        return;
+    }
+    fclose(file);
+
+    // Add the file to the open files list
+    strncpy(open_files[open_file_count].filename, filename, sizeof(open_files[0].filename));
+    strncpy(open_files[open_file_count].mode, flags, sizeof(open_files[0].mode));
+    open_files[open_file_count].offset = 0;
+    open_file_count++;
+}
+
+void execute_close(char *filename) {
+    for (int i = 0; i < open_file_count; ++i) {
+        if (strcmp(open_files[i].filename, filename) == 0) {
+            // Remove the file from the open files list
+            for (int j = i; j < open_file_count - 1; ++j) {
+                open_files[j] = open_files[j + 1];
+            }
+            open_file_count--;
+            return;
+        }
+    }
+    fprintf(stderr, "Error: File %s is not open\n", filename);
+}
+
+void execute_lsof() {
+    if (open_file_count == 0) {
+        printf("No files are currently open.\n");
+        return;
+    }
+
+    printf("Index\tFilename\tMode\tOffset\n");
+    for (int i = 0; i < open_file_count; ++i) {
+        printf("%d\t%s\t%s\t%u\n", i, open_files[i].filename, open_files[i].mode, open_files[i].offset);
+    }
+}
+
+void execute_lseek(char *filename, uint32_t offset) {
+    for (int i = 0; i < open_file_count; ++i) {
+        if (strcmp(open_files[i].filename, filename) == 0) {
+            // Check if offset is valid
+            FILE *file = fopen(filename, "rb");
+            fseek(file, 0, SEEK_END);
+            uint32_t filesize = ftell(file);
+            fclose(file);
+
+            if (offset > filesize) {
+                fprintf(stderr, "Error: Offset exceeds file size\n");
+                return;
+            }
+
+            open_files[i].offset = offset;
+            return;
+        }
+    }
+    fprintf(stderr, "Error: File %s is not open\n", filename);
+}
+
+void execute_read(char *filename, uint32_t size) {
+    for (int i = 0; i < open_file_count; ++i) {
+        if (strcmp(open_files[i].filename, filename) == 0) {
+            if (strchr(open_files[i].mode, 'r') == NULL) {
+                fprintf(stderr, "Error: File %s is not open for reading\n", filename);
+                return;
+            }
+
+            FILE *file = fopen(filename, "rb");
+            fseek(file, 0, SEEK_END);
+            uint32_t filesize = ftell(file);
+            fseek(file, open_files[i].offset, SEEK_SET);
+
+            uint32_t to_read = size;
+            if (open_files[i].offset + size > filesize) {
+                to_read = filesize - open_files[i].offset;
+            }
+
+            char *buffer = malloc(to_read + 1);
+            fread(buffer, 1, to_read, file);
+            buffer[to_read] = '\0';
+            printf("Read Data: %s\n", buffer);
+            free(buffer);
+
+            open_files[i].offset += to_read;
+            fclose(file);
+            return;
+        }
+    }
+    fprintf(stderr, "Error: File %s is not open\n", filename);
 }

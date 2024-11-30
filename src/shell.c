@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "filesys.h"
 #include "commands.h"
@@ -50,6 +51,29 @@ void shell_loop() {
         } else if (strcmp(command, "exit") == 0) {
             clean_exit();
             break;
+        } else if (strncmp(command, "open ", 5) == 0) {
+            char *args = command + 5;
+            char *filename = strtok(args, " ");
+            char *flags = strtok(NULL, " ");
+            execute_open(filename, flags);
+        } else if (strncmp(command, "close ", 6) == 0) {
+            execute_close(command + 6);
+        } else if (strcmp(command, "lsof") == 0) {
+            execute_lsof();
+        } else if (strncmp(command, "lseek ", 6) == 0) {
+            char *args = command + 6;
+            char *filename = strtok(args, " ");
+            char *offset_str = strtok(NULL, " ");
+            if (filename && offset_str) {
+                execute_lseek(filename, atoi(offset_str));
+            }
+        } else if (strncmp(command, "read ", 5) == 0) {
+            char *args = command + 5;
+            char *filename = strtok(args, " ");
+            char *size_str = strtok(NULL, " ");
+            if (filename && size_str) {
+                execute_read(filename, atoi(size_str));
+            }
         } else {
             fprintf(stderr, "Error: Invalid command\n");
         }

@@ -1,13 +1,17 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -Iinclude
-SRCS = src/main.c src/commands.c src/shell.c
-OBJS = $(SRCS:.c=.o)
+CFLAGS = -Wall -Wextra -Iinclude -fPIE
+LDFLAGS = -pie
+SRC = src/main.o src/commands.o src/shell.o
 TARGET = filesys
 
 all: $(TARGET)
 
-$(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
+$(TARGET): $(SRC)
+	$(CC) $(LDFLAGS) -o $(TARGET) $(SRC)
+
+src/%.o: src/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(SRC) $(TARGET)
+
