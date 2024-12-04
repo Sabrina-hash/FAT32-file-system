@@ -140,11 +140,18 @@ void execute_ls() {
     uint32_t next_cluster;
     uint32_t size;
 
-    for (int i = 0; i < 16; ++i) { // Assuming max 16 entries in current directory
-        read_directory_entry(current_cluster, i, name, &attributes, &next_cluster, &size);
-        if (name[0] != '\0' && (unsigned char)name[0] != 0xE5) { // Skip deleted/empty entries
-            printf("%s%s\n", name, (attributes & 0x10) ? "/" : ""); // Add '/' for directories
+    for (int i = 0; i < 16; ++i) { // Adjust as per directory size
+        if (read_directory_entry(current_cluster, i, name, &attributes, &next_cluster, &size) != 0) {
+            fprintf(stderr, "Error reading directory entry %d\n", i);
+            continue;
         }
+
+        // Skip deleted entries
+        if (name[0] == '\0' || (unsigned char)name[0] == 0xE5) {
+            continue;
+        }
+
+        printf("%s%s\n", name, (attributes & 0x10) ? "/" : ""); // Add '/' for directories
     }
 }
 
@@ -201,7 +208,7 @@ int file_exists_in_fat32(const char *filename, uint8_t *attributes, uint32_t *st
             continue;
         }
 
-        // Compare with the target filename (case-insensitive for FAT32)
+        // Compare with the target filename 
         for (int j = 0; name[j]; j++) {
             name[j] = toupper(name[j]);
         }
@@ -213,11 +220,11 @@ int file_exists_in_fat32(const char *filename, uint8_t *attributes, uint32_t *st
 
         if (strcmp(name, temp_filename) == 0) {
             *start_cluster = next_cluster; // Record the starting cluster
-            return 1;  // File found
+            return 1;  
         }
     }
 
-    return 0;  // File not found
+    return 0;  
 }
 
 void execute_open(char *filename, char *flags) {
@@ -232,7 +239,7 @@ void execute_open(char *filename, char *flags) {
         return;
     }
 
-    // Check if the file is already opened
+    
     for (int i = 0; i < open_file_count; ++i) {
         if (strcmp(open_files[i].filename, filename) == 0) {
             fprintf(stderr, "Error: File %s is already open\n", filename);
@@ -295,13 +302,12 @@ void execute_lseek(char *filename, uint32_t offset) {
         }
     }
 
-    // Error: File not found
     if (!file) {
         fprintf(stderr, "Error: File %s is not open\n", filename);
         return;
     }
 
-    // Error: Offset exceeds file size
+    
     if (offset > file->size) {
         fprintf(stderr, "Error: Offset %u is beyond the file size %u\n", offset, file->size);
         return;
@@ -323,13 +329,12 @@ void execute_read(char *filename, uint32_t size) {
         }
     }
 
-    // Error: File not found
     if (!file) {
         fprintf(stderr, "Error: File %s is not open\n", filename);
         return;
     }
 
-    // Error: File is not open for reading
+    
     if (!strchr(file->mode, 'r')) {
         fprintf(stderr, "Error: File %s is not open for reading\n", filename);
         return;
@@ -361,5 +366,192 @@ void execute_read(char *filename, uint32_t size) {
     printf("Offset updated to %u\n", file->offset);
 
     
+}
+
+int is_directory_empty(uint32_t cluster) {
+    char name[12];
+    uint8_t attributes;
+    uint32_t next_cluster;
+    uint32_t size;
+
+    for (int i = 0; i < 16; ++i) {
+        if (read_directory_entry(cluster, i, name, &attributes, &next_cluster, &size) != 0) {
+            return 0; 
+        }
+
+        if (name[0] != '\0' && (unsigned char)name[0] != 0xE5) { // Skip deleted/empty entries
+            // Skip "." and ".." entries
+            if (strcmp(name, ".") != 0 && strcmp(name, "..") != 0) {
+                return 0; 
+            }
+        }
+    }
+    return 1; // Directory is empty
+}
+
+void clear_fat_entry(uint32_t cluster) {
+    uint32_t fat_offset = boot_sector.reserved_sector_count * boot_sector.bytes_per_sector;
+    uint32_t entry_offset = fat_offset + (cluster * 4);
+
+    uint32_t free_cluster = 0; // Mark cluster as free
+    fseek(image_file, entry_offset, SEEK_SET);
+    fwrite(&free_cluster, sizeof(uint32_t), 1, image_file);
+}
+
+
+void reclaim_clusters(uint32_t start_cluster) {
+    uint32_t cluster = start_cluster;
+    while (cluster < 0xFFFFFF8) { // End of cluster chain
+        uint32_t next_cluster = get_next_cluster(cluster);
+        clear_fat_entry(cluster); // Function to clear the FAT entry for a cluster
+        cluster = next_cluster;
+    }
+}
+
+void execute_rm(const char *filename) {
+    char name[12];
+    uint8_t attributes;
+    uint32_t next_cluster;
+    uint32_t size;
+
+    printf("Debug: Attempting to delete file %s\n", filename);
+
+
+    // Check if the file is open
+    for (int i = 0; i < open_file_count; ++i) {
+        if (strcmp(open_files[i].filename, filename) == 0) {
+            fprintf(stderr, "Error: File %s is currently open and cannot be deleted\n", filename);
+            return;
+        }
+    }
+
+    
+    for (int i = 0; i < 16; ++i) { // Adjust as per directory size
+        if (read_directory_entry(current_cluster, i, name, &attributes, &next_cluster, &size) != 0) {
+            fprintf(stderr, "Error reading directory entry %d\n", i);
+            continue;
+        }
+
+        // Match filename (case-insensitive)
+        char temp_filename[12];
+        strncpy(temp_filename, filename, sizeof(temp_filename));
+        temp_filename[sizeof(temp_filename) - 1] = '\0';
+
+        for (int j = 0; name[j]; j++) {
+            name[j] = toupper(name[j]);
+        }
+        for (int j = 0; temp_filename[j]; j++) {
+            temp_filename[j] = toupper(temp_filename[j]);
+        }
+
+        if (strcmp(name, temp_filename) == 0) {
+            // Ensure it's a file (not a directory)
+            if (attributes & 0x10) {
+                fprintf(stderr, "Error: %s is a directory, not a file\n", filename);
+                return;
+            }
+
+            // Mark the directory entry as deleted
+            uint32_t sector = boot_sector.reserved_sector_count +
+                              (boot_sector.num_fats * boot_sector.sectors_per_fat) +
+                              ((current_cluster - 2) * boot_sector.sectors_per_cluster);
+            uint32_t entry_offset = sector * boot_sector.bytes_per_sector + (i * 32);
+
+            printf("Debug: Deleting entry at offset %u\n", entry_offset);
+            fseek(image_file, entry_offset, SEEK_SET);
+            uint8_t delete_flag = 0xE5;
+            fwrite(&delete_flag, sizeof(uint8_t), 1, image_file);
+
+            // Free the cluster chain
+            uint32_t cluster = next_cluster;
+            while (cluster < 0x0FFFFFF8 && cluster >= 2) {
+                uint32_t fat_offset = boot_sector.reserved_sector_count * boot_sector.bytes_per_sector;
+                uint32_t fat_entry = fat_offset + (cluster * 4);
+                printf("Debug: Freeing cluster %u\n", cluster);
+
+                fseek(image_file, fat_entry, SEEK_SET);
+                uint32_t zero = 0x00000000;
+                fwrite(&zero, sizeof(uint32_t), 1, image_file);
+
+                // Read the next cluster
+                fseek(image_file, fat_entry, SEEK_SET);
+                fread(&cluster, sizeof(uint32_t), 1, image_file);
+            }
+
+            printf("File %s successfully deleted\n", filename);
+
+            // Reload directory after deletion
+           // reload_directory();
+            return;
+        }
+    }
+
+    fprintf(stderr, "Error: File %s not found\n", filename);
+}
+
+void execute_rmdir(char *dirname) {
+    uint8_t attributes;
+    uint32_t start_cluster, size;
+
+    // Check if the directory exists
+    if (!file_exists_in_fat32(dirname, &attributes, &start_cluster, &size)) {
+        fprintf(stderr, "Error: Directory %s does not exist\n", dirname);
+        return;
+    }
+
+    // Check if it is a directory
+    if (!(attributes & 0x10)) {
+        fprintf(stderr, "Error: %s is not a directory\n", dirname);
+        return;
+    }
+
+    // Check if the directory is empty
+    if (!is_directory_empty(start_cluster)) {
+        fprintf(stderr, "Error: Directory %s is not empty\n", dirname);
+        return;
+    }
+
+    // Check if any file in the directory is open
+    for (int i = 0; i < open_file_count; ++i) {
+        if (strncmp(open_files[i].filename, dirname, strlen(dirname)) == 0) {
+            fprintf(stderr, "Error: A file in directory %s is open\n", dirname);
+            return;
+        }
+    }
+
+    // Remove directory entry
+    if (remove_directory_entry(current_cluster, dirname) != 0) {
+        fprintf(stderr, "Error: Failed to remove directory entry for %s\n", dirname);
+        return;
+    }
+
+    // Reclaim clusters used by the directory
+    reclaim_clusters(start_cluster);
+
+    printf("Directory %s deleted successfully\n", dirname);
+}
+
+int remove_directory_entry(uint32_t cluster, char *name) {
+    char entry_name[12];
+    uint8_t attributes;
+    uint32_t next_cluster;
+    uint32_t size;
+
+    for (int i = 0; i < 16; ++i) {
+        if (read_directory_entry(cluster, i, entry_name, &attributes, &next_cluster, &size) != 0) {
+            return -1; // Error reading the directory
+        }
+
+        if (strcmp(entry_name, name) == 0) {
+            uint32_t sector = cluster_to_sector(cluster);
+            uint32_t offset = sector * boot_sector.bytes_per_sector + (i * 32);
+
+            fseek(image_file, offset, SEEK_SET);
+            uint8_t deleted_flag = 0xE5;
+            fwrite(&deleted_flag, sizeof(uint8_t), 1, image_file); // Mark entry as deleted
+            return 0; 
+        }
+    }
+    return -1; 
 }
 

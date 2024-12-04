@@ -74,11 +74,16 @@ void shell_loop() {
             if (filename && size_str) {
                 execute_read(filename, atoi(size_str));
             }
+        } else if (strncmp(command, "rm ", 3) == 0) {
+            execute_rm(command + 3); // Pass filename to `rm`
+        } else if (strncmp(command, "rmdir ", 6) == 0) {
+            execute_rmdir(command + 6); // Pass directory name to `rmdir`
         } else {
             fprintf(stderr, "Error: Invalid command\n");
         }
     }
 }
+
 
 
 void clean_exit() {

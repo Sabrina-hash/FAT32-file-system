@@ -25,6 +25,7 @@ typedef struct {
 
 #define MAX_OPEN_FILES 128
 
+
 // Global Variables
 extern FAT32BootSector boot_sector;
 extern FILE *image_file;
