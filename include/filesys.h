@@ -19,6 +19,8 @@ typedef struct {
     char filename[256];
     char mode[4];
     uint32_t offset;
+    uint32_t size;
+    uint32_t start_cluster;
 } OpenFile;
 
 #define MAX_OPEN_FILES 128
