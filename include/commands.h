@@ -4,5 +4,10 @@
 void execute_info();
 void execute_cd(char *dirname);
 void execute_ls();
+void execute_open(char *filename, char *flags);
+void execute_close(char *filename);
+void execute_lsof();
+void execute_lseek(char *filename, uint32_t offset);
+void execute_read(char *filename, uint32_t size);
 
 #endif // COMMANDS_H
