@@ -73,9 +73,17 @@ void shell_loop() {
                 execute_read(filename, atoi(size_str));
             }
         } else if (strncmp(command, "rm ", 3) == 0) {
-            char *filename = command + 3;
-            if (filename && strlen(filename) > 0) {
-                execute_rm(filename); // Pass filename to `rm`
+            char *args = command + 3;
+
+            if (strncmp(args, "-r ", 3) == 0) { // Check for the "-r" flag
+                char *dirname = args + 3; // Extract directory name after "-r"
+                if (dirname && strlen(dirname) > 0) {
+                    execute_rm_recursive(dirname); // Call recursive removal
+                } else {
+                    fprintf(stderr, "Error: Missing directory name for rm -r\n");
+                }
+            } else if (args && strlen(args) > 0) {
+                execute_rm(args); // Normal file deletion
             } else {
                 fprintf(stderr, "Error: Missing filename for rm\n");
             }
@@ -85,6 +93,13 @@ void shell_loop() {
                 execute_rmdir(dirname); // Pass directory name to `rmdir`
             } else {
                 fprintf(stderr, "Error: Missing directory name for rmdir\n");
+            }
+        } else if (strncmp(command, "dump ", 5) == 0) { // New dump command
+            char *name = command + 5;
+            if (name && strlen(name) > 0) {
+                execute_dump(name); // Call the dump function
+            } else {
+                fprintf(stderr, "Error: Missing filename or directory name for dump\n");
             }
         } else {
             fprintf(stderr, "Error: Invalid command\n");

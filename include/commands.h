@@ -16,8 +16,11 @@ void clear_fat_entry(uint32_t cluster);
 void reclaim_clusters(uint32_t start_cluster);
 void execute_rm(const char *filename);
 void execute_rmdir(char *dirname);
+void execute_rm_recursive(const char *dirname);
 int remove_directory_entry(uint32_t cluster, char *name);
 void reload_directory();
+void execute_dump(const char *name);
+
 
 
 

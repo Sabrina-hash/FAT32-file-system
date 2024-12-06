@@ -489,6 +489,79 @@ void execute_rm(const char *filename) {
     fprintf(stderr, "Error: File %s not found\n", filename);
 }
 
+void execute_rm_recursive(const char *dirname) {
+    char name[12];
+    uint8_t attributes;
+    uint32_t next_cluster;
+    uint32_t size;
+
+    // Find the directory entry
+    for (int i = 0; i < 16; ++i) { // Adjust as per directory size
+        if (read_directory_entry(current_cluster, i, name, &attributes, &next_cluster, &size) != 0) {
+            continue; // Skip errors
+        }
+
+        // Match dirname (case-insensitive)
+        char temp_dirname[12];
+        strncpy(temp_dirname, dirname, sizeof(temp_dirname));
+        temp_dirname[sizeof(temp_dirname) - 1] = '\0';
+
+        for (int j = 0; name[j]; j++) {
+            name[j] = toupper(name[j]);
+        }
+        for (int j = 0; temp_dirname[j]; j++) {
+            temp_dirname[j] = toupper(temp_dirname[j]);
+        }
+
+        if (strcmp(name, temp_dirname) == 0) {
+            if (!(attributes & 0x10)) { // Not a directory
+                fprintf(stderr, "Error: %s is not a directory\n", dirname);
+                return;
+            }
+
+            // Recursively delete directory contents
+            for (int j = 0; j < 16; ++j) {
+                char sub_name[12];
+                uint8_t sub_attributes;
+                uint32_t sub_next_cluster, sub_size;
+
+                if (read_directory_entry(next_cluster, j, sub_name, &sub_attributes, &sub_next_cluster, &sub_size) != 0) {
+                    continue; // Skip errors
+                }
+
+                if (sub_name[0] != '\0' && (unsigned char)sub_name[0] != 0xE5) {
+                    if (strcmp(sub_name, ".") == 0 || strcmp(sub_name, "..") == 0) {
+                        continue; // Skip special entries
+                    }
+
+                    if (sub_attributes & 0x10) { // Subdirectory
+                        execute_rm_recursive(sub_name);
+                    } else { // File
+                        execute_rm(sub_name);
+                    }
+                }
+            }
+
+            // Delete the directory itself
+            uint32_t sector = cluster_to_sector(current_cluster);
+            uint32_t entry_offset = sector * boot_sector.bytes_per_sector + (i * 32);
+
+            fseek(image_file, entry_offset, SEEK_SET);
+            uint8_t delete_flag = 0xE5;
+            fwrite(&delete_flag, sizeof(uint8_t), 1, image_file);
+
+            // Free directory clusters
+            reclaim_clusters(next_cluster);
+
+            printf("Directory %s successfully deleted\n", dirname);
+            return;
+        }
+    }
+
+    fprintf(stderr, "Error: Directory %s not found\n", dirname);
+}
+
+
 void execute_rmdir(char *dirname) {
     uint8_t attributes;
     uint32_t start_cluster, size;
@@ -553,5 +626,68 @@ int remove_directory_entry(uint32_t cluster, char *name) {
         }
     }
     return -1; 
+}
+
+
+void execute_dump(const char *name) {
+    //char entry_name[12];
+    uint8_t attributes;
+    uint32_t start_cluster, size;
+
+    // Find the specified file or directory
+    if (!file_exists_in_fat32(name, &attributes, &start_cluster, &size)) {
+        fprintf(stderr, "Error: File or directory %s not found\n", name);
+        return;
+    }
+
+    if (attributes & 0x10) { // Directory
+        printf("Debug: Dumping raw directory entry data for %s\n", name);
+        for (int i = 0; i < 16; ++i) { // Adjust for directory size
+            char dir_name[12];
+            uint8_t dir_attributes;
+            uint32_t dir_next_cluster, dir_size;
+
+            if (read_directory_entry(start_cluster, i, dir_name, &dir_attributes, &dir_next_cluster, &dir_size) != 0) {
+                continue;
+            }
+
+            if (dir_name[0] != '\0' && (unsigned char)dir_name[0] != 0xE5) {
+                printf("%08X: ", i * 32);
+                for (int j = 0; j < 32; ++j) {
+                    printf("%02X ", ((uint8_t *)dir_name)[j]);
+                }
+                printf("\n");
+            }
+        }
+    } else { // File
+        printf("Debug: Dumping file data for %s\n", name);
+        uint32_t cluster = start_cluster;
+        uint32_t offset = 0;
+        char buffer[16]; // Buffer to read 16 bytes at a time
+
+        while (cluster < 0x0FFFFFF8) { // While not end of cluster chain
+            uint32_t sector = cluster_to_sector(cluster);
+            fseek(image_file, sector * boot_sector.bytes_per_sector, SEEK_SET);
+
+            for (int i = 0; i < boot_sector.bytes_per_sector; i += 16) {
+                size_t read_bytes = fread(buffer, 1, sizeof(buffer), image_file);
+
+                printf("%08X: ", offset);
+                for (size_t j = 0; j < read_bytes; ++j) {
+                    printf("%02X ", (uint8_t)buffer[j]);
+                }
+
+                printf("  ");
+                for (size_t j = 0; j < read_bytes; ++j) {
+                    printf("%c", isprint((unsigned char)buffer[j]) ? buffer[j] : '.');
+                }
+
+                printf("\n");
+                offset += read_bytes;
+            }
+
+            cluster = get_next_cluster(cluster);
+        }
+    }
 }
 
