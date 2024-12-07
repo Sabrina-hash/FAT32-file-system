@@ -10,6 +10,14 @@ FILE *image_file = NULL;
 char image_name[256];
 char current_path[256] = "/";       // Initialize to root directory
 uint32_t current_cluster;  
+unsigned int FAT[1000] = {0};       // Initialize FAT to zero (simulate empty FAT)
+
+// Function to initialize the simulated FAT array
+void initialize_fat() {
+    FAT[0] = 0xFFFFFFFF; // Reserved entry
+    FAT[1] = 0xFFFFFFFF; // Reserved entry
+    // All other entries are zero (already initialized)
+}
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
@@ -24,6 +32,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+     // Initialize FAT array
+    initialize_fat();
+    
     // Store image name for the prompt
     strncpy(image_name, argv[1], sizeof(image_name) - 1);
 
