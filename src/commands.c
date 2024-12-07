@@ -9,7 +9,15 @@
 // Helper macro for minimum value
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+//directory and archive attributes
+#define ATTR_DIRECTORY 0x10
+#define ATTR_ARCHIVE 0x20
 #endif
+
+//simulated FAT array
+unsigned int FAT[1000] = {0}; 
+
 
 // Function to get the next cluster in the FAT chain
 uint32_t get_next_cluster(uint32_t cluster) {
@@ -361,5 +369,58 @@ void execute_read(char *filename, uint32_t size) {
     printf("Offset updated to %u\n", file->offset);
 
     
+}
+
+// Helper to simulate creating a directory entry
+void create_directory_entry(const char *name, unsigned char attr, unsigned int cluster) {
+    DirectoryEntry entry = {0};
+    strncpy(entry.DIR_Name, name, 11); // Copy name
+    entry.DIR_Attr = attr;            // Set attribute
+    entry.DIR_FirstClusterLow = cluster & 0xFFFF;
+    entry.DIR_FirstClusterHigh = (cluster >> 16) & 0xFFFF;
+    entry.DIR_FileSize = 0;           // Default size is 0
+
+    // For now, print out the created entry for debugging
+    printf("Created directory entry: %s (Attr: 0x%X, Cluster: %u)\n", name, attr, cluster);
+}
+
+// Helper function to allocate a cluster (returns 0 if no free cluster)
+unsigned int allocate_cluster() {
+    for (unsigned int i = 2; i < sizeof(FAT) / sizeof(FAT[0]); i++) {
+        if (FAT[i] == 0) {
+            return i; // Free cluster found
+        }
+    }
+    return 0; // No free cluster
+}
+
+// Function to create a directory
+void create_directory(const char *dirname) {
+    if (strlen(dirname) > 11) {
+        fprintf(stderr, "Error: Directory name too long.\n");
+        return;
+    }
+
+    unsigned int cluster = allocate_cluster();
+    if (cluster == 0) {
+        fprintf(stderr, "Error: No free clusters available.\n");
+        return;
+    }
+
+    FAT[cluster] = 0xFFFFFFFF; // Mark as end-of-cluster (EOC)
+
+    create_directory_entry(dirname, ATTR_DIRECTORY, cluster);
+    create_directory_entry(".", ATTR_DIRECTORY, cluster); // Current directory entry
+    create_directory_entry("..", ATTR_DIRECTORY, 0);      // Parent directory (root assumed as 0)
+}
+
+// Function to create a file
+void create_file(const char *filename) {
+    if (strlen(filename) > 11) {
+        fprintf(stderr, "Error: File name too long.\n");
+        return;
+    }
+
+    create_directory_entry(filename, ATTR_ARCHIVE, 0); // Create file without allocating a cluster
 }
 

@@ -48,7 +48,11 @@ void shell_loop() {
             execute_ls(); // List directory contents
         } else if (strcmp(command, "info") == 0) {
             execute_info(); // Display boot sector info
-        } else if (strcmp(command, "exit") == 0) {
+        } else if (strncmp(command, "mkdir ", 6) == 0) {
+            create_directory(command + 6);
+        } else if (strncmp(command, "create ", 6) == 0) {
+            create_file(command + 6);
+        }else if (strcmp(command, "exit") == 0) {
             clean_exit();
             break;
         } else if (strncmp(command, "open ", 5) == 0) {

@@ -16,6 +16,15 @@ typedef struct {
 } FAT32BootSector;
 
 typedef struct {
+    char DIR_Name[11];          
+    unsigned char DIR_Attr;      // Attribute
+    unsigned char Reserved[10];  // Reserved bytes
+    unsigned short DIR_FirstClusterLow;
+    unsigned short DIR_FirstClusterHigh;
+    unsigned int DIR_FileSize;   // File size in bytes
+} DirectoryEntry;
+
+typedef struct {
     char filename[256];
     char mode[4];
     uint32_t offset;
@@ -24,6 +33,9 @@ typedef struct {
 } OpenFile;
 
 #define MAX_OPEN_FILES 128
+#define ATTR_DIRECTORY 0x10
+#define ATTR_ARCHIVE 0x20
+
 
 // Global Variables
 extern FAT32BootSector boot_sector;
@@ -31,6 +43,7 @@ extern FILE *image_file;
 extern char image_name[256];
 extern char current_path[256];      // Current working directory path
 extern uint32_t current_cluster;   // Current directory's starting cluster
+extern unsigned int FAT[1000];
 extern OpenFile open_files[MAX_OPEN_FILES];
 extern int open_file_count;
 
