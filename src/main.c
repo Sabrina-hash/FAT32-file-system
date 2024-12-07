@@ -11,14 +11,22 @@ char image_name[256];
 char current_path[256] = "/";       // Initialize to root directory
 uint32_t current_cluster;  
 
+void cleanup() {
+    if (image_file) {
+        fclose(image_file);
+        image_file = NULL;
+    }
+    printf("Resources cleaned up. Exiting program...\n");
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         fprintf(stderr, "Usage: %s [FAT32 IMAGE]\n", argv[0]);
         return 1;
     }
 
-    // Open the image file
-    image_file = fopen(argv[1], "rb");
+    // Open the image file in read/write mode
+    image_file = fopen(argv[1], "rb+");
     if (image_file == NULL) {
         perror("Error opening file");
         return 1;
@@ -32,6 +40,9 @@ int main(int argc, char *argv[]) {
 
     // Start shell interface
     shell_loop();
+
+    // Cleanup resources when shell exits
+    cleanup();
 
     return 0;
 }

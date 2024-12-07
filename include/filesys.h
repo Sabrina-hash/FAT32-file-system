@@ -25,6 +25,7 @@ typedef struct {
 
 #define MAX_OPEN_FILES 128
 
+
 // Global Variables
 extern FAT32BootSector boot_sector;
 extern FILE *image_file;
@@ -38,5 +39,6 @@ extern int open_file_count;
 void parse_boot_sector();
 void shell_loop();
 void clean_exit();
+void cleanup();
 
 #endif // FILESYS_H
