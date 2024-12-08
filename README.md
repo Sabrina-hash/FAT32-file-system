@@ -131,6 +131,7 @@ root/
 
 ### Compilation
 For a C/C++ example:
+
 make clean && make
 
 This will build the executable in ...
