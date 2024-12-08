@@ -34,7 +34,7 @@ void parse_boot_sector() {
 }
 
 void shell_loop() {
-    char command[256];
+    char command[256]; char arg1 [256]; char arg2[256];
     while (1) {
         printf("[%s]%s> ", image_name, current_path);
         fgets(command, sizeof(command), stdin);
@@ -53,7 +53,10 @@ void shell_loop() {
             char *args = command + 5;
             char *filename = strtok(args, " ");
             char *flags = strtok(NULL, " ");
-            execute_open(filename, flags);
+            if(filename == NULL || flags == NULL){
+                fprintf(stderr, "Error: Ivalid syntax for open. Usage: open <filename> <flags>\n");
+            }else{
+            execute_open(filename, flags);}
         } else if (strncmp(command, "close ", 6) == 0) {
             execute_close(command + 6);
         } else if (strcmp(command, "lsof") == 0) {
@@ -101,7 +104,23 @@ void shell_loop() {
             } else {
                 fprintf(stderr, "Error: Missing filename or directory name for dump\n");
             }
-        } else {
+        } else if (strncmp(command, "mkdir ", 6) == 0) {
+            create_directory(command + 6);
+        } else if (strncmp(command, "creat ", 6) == 0) {
+            create_file(command + 6);
+        }else if (strncmp(command, "write ", 6) == 0) {
+            if (sscanf(command + 6, "%s \"%[^\"]\"", arg1, arg2) == 2) {
+                write_to_file(arg1, arg2);
+            } else {
+                fprintf(stderr, "Error: Invalid syntax for write command.\n");
+            }
+        } else if (strncmp(command, "rename ", 7) == 0) {
+            if (sscanf(command + 7, "%s %s", arg1, arg2) == 2) {
+                rename_file(arg1, arg2);
+            } else {
+                fprintf(stderr, "Error: Invalid syntax for rename command.\n");
+            }
+        }else {
             fprintf(stderr, "Error: Invalid command\n");
         }
     }
