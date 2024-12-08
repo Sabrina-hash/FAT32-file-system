@@ -112,16 +112,16 @@ For those seeking additional challenges and opportunities to earn extra credit, 
 
 ## File Listing
 root/
-├── main/
-    ├──include/
-        ├── commands.h
-        ├── filesys.h
-    ├── src/
-        ├── commands.c
-        ├──main.c
-        ├──shell.c
-    ├──makefile
-    ├──Readme.md
+├── include/
+│   ├── commands.h
+│   ├── filesys.h
+├── src/
+│   ├── commands.c
+│   ├── main.c
+│   ├── shell.c
+├── makefile
+├── Readme.md
+
 
 ## How to Compile & Execute
 
