@@ -112,7 +112,7 @@ For those seeking additional challenges and opportunities to earn extra credit, 
 
 ## File Listing
 root/
-├── part1/
+├── main/
     ├──include/
         ├── commands.h
         ├── filesys.h
@@ -120,51 +120,6 @@ root/
         ├── commands.c
         ├──main.c
         ├──shell.c
-    ├──fat32.img
-    ├──makefile
-    ├──Readme.md
-├──part2/
-        ├──include/
-        ├── commands.h
-        ├── filesys.h
-    ├── src/
-        ├── commands.c
-        ├──main.c
-        ├──shell.c
-    ├──fat32.img
-    ├──makefile
-    ├──Readme.md
-├──part3/
-    ├──include/
-        ├── commands.h
-        ├── filesys.h
-    ├── src/
-        ├── commands.c
-        ├──main.c
-        ├──shell.c
-    ├──fat32.img
-    ├──makefile
-    ├──Readme.md
-├──part5/
-    ├──include/
-        ├── commands.h
-        ├── filesys.h
-    ├── src/
-        ├── commands.c
-        ├──main.c
-        ├──shell.c
-    ├──fat32.img
-    ├──makefile
-    ├──Readme.md
-├──part6/
-    ├──include/
-        ├── commands.h
-        ├── filesys.h
-    ├── src/
-        ├── commands.c
-        ├──main.c
-        ├──shell.c
-    ├──fat32.img
     ├──makefile
     ├──Readme.md
 
@@ -176,7 +131,7 @@ root/
 
 ### Compilation
 For a C/C++ example:
-make
+make clean && make
 
 This will build the executable in ...
 ### Execution
