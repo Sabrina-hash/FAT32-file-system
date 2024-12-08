@@ -20,9 +20,9 @@ void execute_rm_recursive(const char *dirname);
 int remove_directory_entry(uint32_t cluster, char *name);
 void reload_directory();
 void execute_dump(const char *name);
-
-
-
-
-
+void create_directory(const char *dirname);
+void create_file(const char *filename);
+void write_to_file(const char *filename, const char *string);
+void rename_file(const char *filename, const char *newFilename);
+void create_directory_entry(const char *name, unsigned char attr, unsigned int cluster);
 #endif // COMMANDS_H
